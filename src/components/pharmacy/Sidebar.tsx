@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Pill,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,7 @@ const menuItems = [
   { icon: History, label: 'Riwayat Transaksi', path: '/riwayat' },
   { icon: Package, label: 'Stok Obat', path: '/stok' },
   { icon: ClipboardCheck, label: 'Stok Opname', path: '/stok-opname' },
+  { icon: BarChart3, label: 'Laporan', path: '/laporan' },
   { icon: Settings, label: 'Pengaturan', path: '/pengaturan' },
 ];
 
