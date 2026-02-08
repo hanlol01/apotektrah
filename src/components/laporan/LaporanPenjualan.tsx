@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -17,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Download, TrendingUp, ShoppingCart, Receipt, Users } from 'lucide-react';
+import { Download, TrendingUp, ShoppingCart, Receipt, Users, Loader2 } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -29,24 +28,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-
-const salesData = [
-  { date: '01 Jan', penjualan: 2500000, transaksi: 45 },
-  { date: '02 Jan', penjualan: 3200000, transaksi: 52 },
-  { date: '03 Jan', penjualan: 2800000, transaksi: 48 },
-  { date: '04 Jan', penjualan: 4100000, transaksi: 61 },
-  { date: '05 Jan', penjualan: 3500000, transaksi: 55 },
-  { date: '06 Jan', penjualan: 2900000, transaksi: 47 },
-  { date: '07 Jan', penjualan: 3800000, transaksi: 58 },
-];
-
-const topProducts = [
-  { name: 'Amoxicillin 500mg', qty: 250, revenue: 625000 },
-  { name: 'Paracetamol 500mg', qty: 500, revenue: 250000 },
-  { name: 'Omeprazole 20mg', qty: 150, revenue: 525000 },
-  { name: 'Vitamin C 500mg', qty: 400, revenue: 120000 },
-  { name: 'Cetirizine 10mg', qty: 180, revenue: 270000 },
-];
+import { useSalesReport } from '@/hooks/useReports';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -56,12 +38,32 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-export function LaporanPenjualan() {
-  const [period, setPeriod] = useState('daily');
+const formatShortCurrency = (amount: number) => {
+  if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(1)}jt`;
+  }
+  if (amount >= 1000) {
+    return `${(amount / 1000).toFixed(0)}rb`;
+  }
+  return formatCurrency(amount);
+};
 
-  const totalPenjualan = salesData.reduce((sum, d) => sum + d.penjualan, 0);
-  const totalTransaksi = salesData.reduce((sum, d) => sum + d.transaksi, 0);
-  const rataRata = totalPenjualan / salesData.length;
+export function LaporanPenjualan() {
+  const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month');
+  const { data: report, isLoading } = useSalesReport(period);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Memuat data laporan...</span>
+      </div>
+    );
+  }
+
+  const totalPenjualan = report?.totalSales || 0;
+  const totalTransaksi = report?.totalTransactions || 0;
+  const rataRata = report?.averageTransaction || 0;
 
   return (
     <div className="space-y-6">
@@ -71,25 +73,16 @@ export function LaporanPenjualan() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Periode:</span>
-              <Select value={period} onValueChange={setPeriod}>
+              <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Harian</SelectItem>
-                  <SelectItem value="weekly">Mingguan</SelectItem>
-                  <SelectItem value="monthly">Bulanan</SelectItem>
-                  <SelectItem value="yearly">Tahunan</SelectItem>
+                  <SelectItem value="week">7 Hari Terakhir</SelectItem>
+                  <SelectItem value="month">Bulan Ini</SelectItem>
+                  <SelectItem value="year">Tahun Ini</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Dari:</span>
-              <Input type="date" className="w-40" defaultValue="2024-01-01" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Sampai:</span>
-              <Input type="date" className="w-40" defaultValue="2024-01-07" />
             </div>
             <Button variant="outline" className="ml-auto flex items-center gap-2">
               <Download className="h-4 w-4" />
@@ -136,8 +129,8 @@ export function LaporanPenjualan() {
                 <ShoppingCart className="h-6 w-6 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Rata-rata/Hari</p>
-                <p className="text-2xl font-bold">{formatCurrency(rataRata)}</p>
+                <p className="text-sm text-muted-foreground">Resep Biasa</p>
+                <p className="text-2xl font-bold">{report?.regularPrescriptions || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -151,7 +144,7 @@ export function LaporanPenjualan() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Rata-rata/Transaksi</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalPenjualan / totalTransaksi)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(rataRata)}</p>
               </div>
             </div>
           </CardContent>
@@ -166,27 +159,43 @@ export function LaporanPenjualan() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis 
-                    tickFormatter={(value) => `${(value / 1000000).toFixed(1)}jt`}
-                    className="text-xs"
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => [formatCurrency(value), 'Penjualan']}
-                    labelClassName="font-medium"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="penjualan"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary) / 0.2)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {report?.dailySales && report.dailySales.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={report.dailySales}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      dataKey="date"
+                      className="text-xs"
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return `${date.getDate()}/${date.getMonth() + 1}`;
+                      }}
+                    />
+                    <YAxis 
+                      tickFormatter={formatShortCurrency}
+                      className="text-xs"
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value), 'Penjualan']}
+                      labelFormatter={(label) => {
+                        const date = new Date(label);
+                        return date.toLocaleDateString('id-ID');
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke="hsl(var(--primary))"
+                      fill="hsl(var(--primary) / 0.2)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Belum ada data penjualan
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -197,22 +206,38 @@ export function LaporanPenjualan() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    formatter={(value: number) => [value, 'Transaksi']}
-                    labelClassName="font-medium"
-                  />
-                  <Bar
-                    dataKey="transaksi"
-                    fill="hsl(var(--primary))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {report?.dailySales && report.dailySales.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={report.dailySales}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      dataKey="date"
+                      className="text-xs"
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return `${date.getDate()}/${date.getMonth() + 1}`;
+                      }}
+                    />
+                    <YAxis className="text-xs" />
+                    <Tooltip 
+                      formatter={(value: number) => [value, 'Transaksi']}
+                      labelFormatter={(label) => {
+                        const date = new Date(label);
+                        return date.toLocaleDateString('id-ID');
+                      }}
+                    />
+                    <Bar
+                      dataKey="transactions"
+                      fill="hsl(var(--primary))"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Belum ada data transaksi
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -224,26 +249,32 @@ export function LaporanPenjualan() {
           <CardTitle className="text-base">Produk Terlaris</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>No</TableHead>
-                <TableHead>Nama Obat</TableHead>
-                <TableHead className="text-right">Qty Terjual</TableHead>
-                <TableHead className="text-right">Pendapatan</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {topProducts.map((product, index) => (
-                <TableRow key={product.name}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-right">{product.qty}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(product.revenue)}</TableCell>
+          {report?.topProducts && report.topProducts.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>No</TableHead>
+                  <TableHead>Nama Obat</TableHead>
+                  <TableHead className="text-right">Qty Terjual</TableHead>
+                  <TableHead className="text-right">Pendapatan</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {report.topProducts.map((product, index) => (
+                  <TableRow key={product.name}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="text-right">{product.quantity}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(product.revenue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Belum ada data produk terjual
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
