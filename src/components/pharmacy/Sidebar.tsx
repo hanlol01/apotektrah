@@ -6,6 +6,7 @@ import {
   Beaker,
   History,
   Package,
+  ClipboardCheck,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,7 @@ const menuItems = [
   { icon: Beaker, label: 'Resep Racikan', path: '/resep-racikan' },
   { icon: History, label: 'Riwayat Transaksi', path: '/riwayat' },
   { icon: Package, label: 'Stok Obat', path: '/stok' },
+  { icon: ClipboardCheck, label: 'Stok Opname', path: '/stok-opname' },
   { icon: Settings, label: 'Pengaturan', path: '/pengaturan' },
 ];
 
