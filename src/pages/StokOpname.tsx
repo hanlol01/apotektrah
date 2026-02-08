@@ -71,6 +71,7 @@ export default function StokOpname() {
   const [notes, setNotes] = useState('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<string>('');
+  const [isFullOpname, setIsFullOpname] = useState(false);
 
   const generateOpnameNumber = () => {
     const date = new Date();
@@ -84,6 +85,29 @@ export default function StokOpname() {
       medicine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       medicine.genericName.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Filter for table search when in full opname mode
+  const filteredOpnameItems = isFullOpname && searchTerm
+    ? opnameItems.filter(
+        (item) =>
+          item.medicine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.medicine.genericName.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : opnameItems;
+
+  const loadAllMedicines = () => {
+    const allItems: OpnameItem[] = mockMedicines.map((medicine, index) => ({
+      id: `${Date.now()}-${index}`,
+      medicine,
+      systemStock: medicine.stock,
+      actualStock: medicine.stock,
+      difference: 0,
+      reason: '',
+    }));
+    setOpnameItems(allItems);
+    setIsFullOpname(true);
+    toast.success(`${mockMedicines.length} obat berhasil dimuat untuk opname`);
+  };
 
   const addMedicineToOpname = (medicineId: string) => {
     const medicine = mockMedicines.find((m) => m.id === medicineId);
@@ -99,7 +123,7 @@ export default function StokOpname() {
       id: Date.now().toString(),
       medicine,
       systemStock: medicine.stock,
-      actualStock: medicine.stock, // Default to system stock
+      actualStock: medicine.stock,
       difference: 0,
       reason: '',
     };
@@ -181,6 +205,7 @@ export default function StokOpname() {
     // Reset form
     setOpnameItems([]);
     setNotes('');
+    setIsFullOpname(false);
     setShowConfirmDialog(false);
   };
 
@@ -196,39 +221,58 @@ export default function StokOpname() {
         <div className="lg:col-span-2 space-y-6">
           {/* Medicine Selection */}
           <div className="card-pharmacy">
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Tambah Obat untuk Opname
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                {isFullOpname ? 'Filter Obat' : 'Tambah Obat untuk Opname'}
+              </h3>
+              {!isFullOpname && opnameItems.length === 0 && (
+                <Button
+                  onClick={loadAllMedicines}
+                  className="btn-primary-gradient"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Opname Seluruh Obat
+                </Button>
+              )}
+            </div>
 
             <div className="flex gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama obat..."
+                  placeholder={isFullOpname ? "Cari obat dalam daftar..." : "Cari nama obat..."}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 input-pharmacy"
                 />
               </div>
 
-              <Select value={selectedMedicine} onValueChange={addMedicineToOpname}>
-                <SelectTrigger className="w-64 input-pharmacy">
-                  <SelectValue placeholder="Pilih obat" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredMedicines.map((medicine) => (
-                    <SelectItem key={medicine.id} value={medicine.id}>
-                      <div className="flex justify-between items-center w-full">
-                        <span>{medicine.name}</span>
-                        <span className="text-muted-foreground text-xs ml-2">
-                          Stok: {medicine.stock}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!isFullOpname && (
+                <Select value={selectedMedicine} onValueChange={addMedicineToOpname}>
+                  <SelectTrigger className="w-64 input-pharmacy">
+                    <SelectValue placeholder="Pilih obat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredMedicines.map((medicine) => (
+                      <SelectItem key={medicine.id} value={medicine.id}>
+                        <div className="flex justify-between items-center w-full">
+                          <span>{medicine.name}</span>
+                          <span className="text-muted-foreground text-xs ml-2">
+                            Stok: {medicine.stock}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
+
+            {isFullOpname && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Mode Opname Keseluruhan: {filteredOpnameItems.length} dari {opnameItems.length} obat ditampilkan
+              </p>
+            )}
           </div>
 
           {/* Opname Items Table */}
@@ -255,9 +299,9 @@ export default function StokOpname() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-border">
+              <div className="overflow-hidden rounded-lg border border-border max-h-[500px] overflow-y-auto">
                 <table className="table-pharmacy">
-                  <thead>
+                  <thead className="sticky top-0 bg-background z-10">
                     <tr>
                       <th>Nama Obat</th>
                       <th className="text-center">Stok Sistem</th>
@@ -268,7 +312,7 @@ export default function StokOpname() {
                     </tr>
                   </thead>
                   <tbody>
-                    {opnameItems.map((item) => {
+                    {filteredOpnameItems.map((item) => {
                       const status = getDifferenceStatus(item.difference);
                       const StatusIcon = status.icon;
 
@@ -439,6 +483,7 @@ export default function StokOpname() {
                   onClick={() => {
                     setOpnameItems([]);
                     setNotes('');
+                    setIsFullOpname(false);
                   }}
                 >
                   Reset Form
