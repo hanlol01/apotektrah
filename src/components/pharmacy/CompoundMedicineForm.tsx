@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CompoundItem, CompoundPrescription, Medicine } from '@/types/pharmacy';
-import { mockMedicines, dosageOptions, instructionOptions, compoundForms } from '@/data/mockData';
+import { useMedicines, DbMedicine } from '@/hooks/useMedicines';
+import { dosageOptions, instructionOptions, compoundForms } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Beaker, FlaskConical } from 'lucide-react';
+import { Plus, Trash2, Beaker, FlaskConical, Loader2 } from 'lucide-react';
 
 interface CompoundMedicineFormProps {
   prescriptions: CompoundPrescription[];
@@ -20,10 +21,24 @@ interface CompoundMedicineFormProps {
 
 const COMPOUND_SERVICE_FEE = 15000; // Biaya racik per resep
 
+// Helper to convert DB medicine to app medicine type
+function toAppMedicine(dbMed: DbMedicine): Medicine {
+  return {
+    id: dbMed.id,
+    name: dbMed.name,
+    genericName: dbMed.generic_name,
+    unit: dbMed.unit,
+    price: Number(dbMed.price),
+    stock: dbMed.stock,
+    category: dbMed.category,
+  };
+}
+
 export function CompoundMedicineForm({
   prescriptions,
   onPrescriptionsChange,
 }: CompoundMedicineFormProps) {
+  const { data: medicines, isLoading } = useMedicines();
   const [currentItems, setCurrentItems] = useState<CompoundItem[]>([]);
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [quantity, setQuantity] = useState<string>('');
@@ -34,8 +49,8 @@ export function CompoundMedicineForm({
   const [instructions, setInstructions] = useState('');
 
   const handleMedicineSelect = (medicineId: string) => {
-    const medicine = mockMedicines.find((m) => m.id === medicineId);
-    setSelectedMedicine(medicine || null);
+    const medicine = medicines?.find((m) => m.id === medicineId);
+    setSelectedMedicine(medicine ? toAppMedicine(medicine) : null);
   };
 
   const handleAddIngredient = () => {
@@ -122,12 +137,19 @@ export function CompoundMedicineForm({
         <div className="grid grid-cols-4 gap-4 mb-4">
           <div className="space-y-2 col-span-2">
             <Label className="text-sm font-medium">Nama Obat/Bahan</Label>
-            <Select onValueChange={handleMedicineSelect} value={selectedMedicine?.id || ''}>
+            <Select onValueChange={handleMedicineSelect} value={selectedMedicine?.id || ''} disabled={isLoading}>
               <SelectTrigger className="input-pharmacy">
-                <SelectValue placeholder="Pilih bahan obat" />
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Memuat...</span>
+                  </div>
+                ) : (
+                  <SelectValue placeholder="Pilih bahan obat" />
+                )}
               </SelectTrigger>
               <SelectContent>
-                {mockMedicines.map((med) => (
+                {medicines?.map((med) => (
                   <SelectItem key={med.id} value={med.id}>
                     {med.name}
                   </SelectItem>

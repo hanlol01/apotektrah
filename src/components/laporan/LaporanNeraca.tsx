@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Building2, Wallet, Scale } from 'lucide-react';
+import { Download, Building2, Wallet, Scale, Loader2 } from 'lucide-react';
+import { useBalanceSheet } from '@/hooks/useReports';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -11,47 +15,24 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-const aktivaLancar = [
-  { label: 'Kas & Bank', amount: 85000000 },
-  { label: 'Piutang Usaha', amount: 15000000 },
-  { label: 'Persediaan Obat', amount: 120000000 },
-  { label: 'Perlengkapan', amount: 5000000 },
-];
-
-const aktivaTetap = [
-  { label: 'Peralatan Apotek', amount: 50000000 },
-  { label: 'Akumulasi Penyusutan', amount: -10000000 },
-  { label: 'Kendaraan', amount: 80000000 },
-  { label: 'Akumulasi Penyusutan Kendaraan', amount: -16000000 },
-];
-
-const kewajibanLancar = [
-  { label: 'Utang Usaha (Supplier)', amount: 45000000 },
-  { label: 'Utang Gaji', amount: 12000000 },
-  { label: 'Utang Pajak', amount: 3000000 },
-];
-
-const kewajibanJangkaPanjang = [
-  { label: 'Utang Bank', amount: 50000000 },
-];
-
-const modalData = [
-  { label: 'Modal Disetor', amount: 150000000 },
-  { label: 'Laba Ditahan', amount: 48000000 },
-  { label: 'Laba Periode Berjalan', amount: 21000000 },
-];
-
 export function LaporanNeraca() {
-  const totalAktivaLancar = aktivaLancar.reduce((sum, d) => sum + d.amount, 0);
-  const totalAktivaTetap = aktivaTetap.reduce((sum, d) => sum + d.amount, 0);
-  const totalAktiva = totalAktivaLancar + totalAktivaTetap;
+  const [asOfDate, setAsOfDate] = useState(new Date().toISOString().split('T')[0]);
+  const { data: balanceSheet, isLoading } = useBalanceSheet(new Date(asOfDate));
 
-  const totalKewajibanLancar = kewajibanLancar.reduce((sum, d) => sum + d.amount, 0);
-  const totalKewajibanJangkaPanjang = kewajibanJangkaPanjang.reduce((sum, d) => sum + d.amount, 0);
-  const totalKewajiban = totalKewajibanLancar + totalKewajibanJangkaPanjang;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Memuat data laporan...</span>
+      </div>
+    );
+  }
 
-  const totalModal = modalData.reduce((sum, d) => sum + d.amount, 0);
+  const totalAktiva = balanceSheet?.assets.totalAssets || 0;
+  const totalKewajiban = balanceSheet?.liabilities.totalLiabilities || 0;
+  const totalModal = balanceSheet?.equity.totalEquity || 0;
   const totalPasiva = totalKewajiban + totalModal;
+  const isBalanced = balanceSheet?.isBalanced || false;
 
   return (
     <div className="space-y-6">
@@ -61,7 +42,12 @@ export function LaporanNeraca() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Per Tanggal:</span>
-              <Input type="date" className="w-48" defaultValue="2024-01-31" />
+              <Input
+                type="date"
+                className="w-48"
+                value={asOfDate}
+                onChange={(e) => setAsOfDate(e.target.value)}
+              />
             </div>
             <Button variant="outline" className="ml-auto flex items-center gap-2">
               <Download className="h-4 w-4" />
@@ -122,7 +108,9 @@ export function LaporanNeraca() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">AKTIVA</CardTitle>
-            <p className="text-sm text-muted-foreground">Per 31 Januari 2024</p>
+            <p className="text-sm text-muted-foreground">
+              Per {format(new Date(asOfDate), 'd MMMM yyyy', { locale: id })}
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -130,16 +118,22 @@ export function LaporanNeraca() {
               <div>
                 <h3 className="font-semibold text-sm mb-3 text-primary">Aktiva Lancar</h3>
                 <div className="space-y-2 pl-4">
-                  {aktivaLancar.map((item) => (
-                    <div key={item.label} className="flex justify-between py-1">
-                      <span className="text-sm text-muted-foreground">{item.label}</span>
-                      <span className="text-sm">{formatCurrency(item.amount)}</span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Kas & Bank</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.assets.cash || 0)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Persediaan Obat</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.assets.inventory || 0)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Piutang Usaha</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.assets.receivables || 0)}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between py-2 mt-2 border-t font-medium text-sm">
                   <span>Total Aktiva Lancar</span>
-                  <span>{formatCurrency(totalAktivaLancar)}</span>
+                  <span>{formatCurrency(balanceSheet?.assets.totalCurrent || 0)}</span>
                 </div>
               </div>
 
@@ -147,18 +141,14 @@ export function LaporanNeraca() {
               <div>
                 <h3 className="font-semibold text-sm mb-3 text-primary">Aktiva Tetap</h3>
                 <div className="space-y-2 pl-4">
-                  {aktivaTetap.map((item) => (
-                    <div key={item.label} className="flex justify-between py-1">
-                      <span className="text-sm text-muted-foreground">{item.label}</span>
-                      <span className={`text-sm ${item.amount < 0 ? 'text-destructive' : ''}`}>
-                        {item.amount < 0 ? `(${formatCurrency(Math.abs(item.amount))})` : formatCurrency(item.amount)}
-                      </span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Peralatan & Inventaris</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.assets.fixedAssets || 0)}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between py-2 mt-2 border-t font-medium text-sm">
                   <span>Total Aktiva Tetap</span>
-                  <span>{formatCurrency(totalAktivaTetap)}</span>
+                  <span>{formatCurrency(balanceSheet?.assets.fixedAssets || 0)}</span>
                 </div>
               </div>
 
@@ -175,7 +165,9 @@ export function LaporanNeraca() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">PASIVA</CardTitle>
-            <p className="text-sm text-muted-foreground">Per 31 Januari 2024</p>
+            <p className="text-sm text-muted-foreground">
+              Per {format(new Date(asOfDate), 'd MMMM yyyy', { locale: id })}
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -183,16 +175,14 @@ export function LaporanNeraca() {
               <div>
                 <h3 className="font-semibold text-sm mb-3 text-primary">Kewajiban Lancar</h3>
                 <div className="space-y-2 pl-4">
-                  {kewajibanLancar.map((item) => (
-                    <div key={item.label} className="flex justify-between py-1">
-                      <span className="text-sm text-muted-foreground">{item.label}</span>
-                      <span className="text-sm">{formatCurrency(item.amount)}</span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Hutang Usaha</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.liabilities.payables || 0)}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between py-2 mt-2 border-t font-medium text-sm">
                   <span>Total Kewajiban Lancar</span>
-                  <span>{formatCurrency(totalKewajibanLancar)}</span>
+                  <span>{formatCurrency(balanceSheet?.liabilities.totalCurrent || 0)}</span>
                 </div>
               </div>
 
@@ -200,16 +190,14 @@ export function LaporanNeraca() {
               <div>
                 <h3 className="font-semibold text-sm mb-3 text-primary">Kewajiban Jangka Panjang</h3>
                 <div className="space-y-2 pl-4">
-                  {kewajibanJangkaPanjang.map((item) => (
-                    <div key={item.label} className="flex justify-between py-1">
-                      <span className="text-sm text-muted-foreground">{item.label}</span>
-                      <span className="text-sm">{formatCurrency(item.amount)}</span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Hutang Bank</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.liabilities.longTerm || 0)}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between py-2 mt-2 border-t font-medium text-sm">
-                  <span>Total Kewajiban Jangka Panjang</span>
-                  <span>{formatCurrency(totalKewajibanJangkaPanjang)}</span>
+                  <span>Total Kewajiban</span>
+                  <span>{formatCurrency(totalKewajiban)}</span>
                 </div>
               </div>
 
@@ -217,12 +205,14 @@ export function LaporanNeraca() {
               <div>
                 <h3 className="font-semibold text-sm mb-3 text-primary">Modal</h3>
                 <div className="space-y-2 pl-4">
-                  {modalData.map((item) => (
-                    <div key={item.label} className="flex justify-between py-1">
-                      <span className="text-sm text-muted-foreground">{item.label}</span>
-                      <span className="text-sm">{formatCurrency(item.amount)}</span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Modal Disetor</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.equity.capital || 0)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Laba Ditahan</span>
+                    <span className="text-sm">{formatCurrency(balanceSheet?.equity.retainedEarnings || 0)}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between py-2 mt-2 border-t font-medium text-sm">
                   <span>Total Modal</span>
@@ -241,13 +231,13 @@ export function LaporanNeraca() {
       </div>
 
       {/* Balance Check */}
-      <Card className={totalAktiva === totalPasiva ? 'border-emerald-500/50' : 'border-destructive/50'}>
+      <Card className={isBalanced ? 'border-emerald-500/50' : 'border-destructive/50'}>
         <CardContent className="pt-6">
           <div className="flex items-center justify-center gap-4">
-            <Scale className={`h-8 w-8 ${totalAktiva === totalPasiva ? 'text-emerald-500' : 'text-destructive'}`} />
+            <Scale className={`h-8 w-8 ${isBalanced ? 'text-emerald-500' : 'text-destructive'}`} />
             <div className="text-center">
-              <p className={`text-lg font-semibold ${totalAktiva === totalPasiva ? 'text-emerald-600' : 'text-destructive'}`}>
-                {totalAktiva === totalPasiva ? 'NERACA SEIMBANG' : 'NERACA TIDAK SEIMBANG'}
+              <p className={`text-lg font-semibold ${isBalanced ? 'text-emerald-600' : 'text-destructive'}`}>
+                {isBalanced ? 'NERACA SEIMBANG' : 'NERACA TIDAK SEIMBANG'}
               </p>
               <p className="text-sm text-muted-foreground">
                 Aktiva: {formatCurrency(totalAktiva)} | Pasiva: {formatCurrency(totalPasiva)}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Medicine, PrescriptionItem } from '@/types/pharmacy';
-import { mockMedicines, dosageOptions, instructionOptions } from '@/data/mockData';
+import { useMedicines, DbMedicine } from '@/hooks/useMedicines';
+import { dosageOptions, instructionOptions } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Pill, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Pill, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MedicineSelectorProps {
@@ -27,15 +28,29 @@ const categoryBadges: Record<string, { label: string; className: string }> = {
   psikotropika: { label: 'Psikotropika', className: 'bg-destructive/15 text-destructive' },
 };
 
+// Helper to convert DB medicine to app medicine type
+function toAppMedicine(dbMed: DbMedicine): Medicine {
+  return {
+    id: dbMed.id,
+    name: dbMed.name,
+    genericName: dbMed.generic_name,
+    unit: dbMed.unit,
+    price: Number(dbMed.price),
+    stock: dbMed.stock,
+    category: dbMed.category,
+  };
+}
+
 export function MedicineSelector({ items, onItemsChange }: MedicineSelectorProps) {
+  const { data: medicines, isLoading } = useMedicines();
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [dosage, setDosage] = useState('');
   const [instructions, setInstructions] = useState('');
 
   const handleMedicineSelect = (medicineId: string) => {
-    const medicine = mockMedicines.find((m) => m.id === medicineId);
-    setSelectedMedicine(medicine || null);
+    const medicine = medicines?.find((m) => m.id === medicineId);
+    setSelectedMedicine(medicine ? toAppMedicine(medicine) : null);
   };
 
   const handleAddItem = () => {
@@ -82,12 +97,19 @@ export function MedicineSelector({ items, onItemsChange }: MedicineSelectorProps
       <div className="grid grid-cols-4 gap-4 mb-6 p-4 bg-muted/30 rounded-lg">
         <div className="space-y-2">
           <Label className="text-sm font-medium">Nama Obat</Label>
-          <Select onValueChange={handleMedicineSelect} value={selectedMedicine?.id || ''}>
+          <Select onValueChange={handleMedicineSelect} value={selectedMedicine?.id || ''} disabled={isLoading}>
             <SelectTrigger className="input-pharmacy">
-              <SelectValue placeholder="Pilih obat" />
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memuat...</span>
+                </div>
+              ) : (
+                <SelectValue placeholder="Pilih obat" />
+              )}
             </SelectTrigger>
             <SelectContent>
-              {mockMedicines.map((med) => (
+              {medicines?.map((med) => (
                 <SelectItem key={med.id} value={med.id}>
                   <div className="flex items-center gap-2">
                     <span>{med.name}</span>

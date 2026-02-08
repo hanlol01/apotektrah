@@ -1,6 +1,6 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -8,8 +8,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Download, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Wallet, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useProfitLossReport } from '@/hooks/useReports';
+import { format, subMonths } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -19,34 +22,34 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-const pendapatanData = [
-  { label: 'Penjualan Obat Resep', amount: 45000000 },
-  { label: 'Penjualan Obat Bebas', amount: 25000000 },
-  { label: 'Jasa Racikan', amount: 8500000 },
-  { label: 'Konsultasi', amount: 2000000 },
-];
-
-const hppData = [
-  { label: 'Pembelian Obat', amount: 35000000 },
-  { label: 'Bahan Racikan', amount: 5000000 },
-];
-
-const bebanOperasionalData = [
-  { label: 'Gaji Karyawan', amount: 12000000 },
-  { label: 'Sewa Tempat', amount: 5000000 },
-  { label: 'Listrik & Air', amount: 1500000 },
-  { label: 'Perlengkapan', amount: 800000 },
-  { label: 'Biaya Administrasi', amount: 500000 },
-  { label: 'Biaya Lain-lain', amount: 700000 },
-];
-
 export function LaporanLabaRugi() {
-  const totalPendapatan = pendapatanData.reduce((sum, d) => sum + d.amount, 0);
-  const totalHPP = hppData.reduce((sum, d) => sum + d.amount, 0);
-  const labaKotor = totalPendapatan - totalHPP;
-  const totalBebanOperasional = bebanOperasionalData.reduce((sum, d) => sum + d.amount, 0);
-  const labaBersih = labaKotor - totalBebanOperasional;
-  const marginLabaBersih = (labaBersih / totalPendapatan) * 100;
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const { data: report, isLoading } = useProfitLossReport(selectedMonth);
+
+  // Generate last 12 months options
+  const monthOptions = Array.from({ length: 12 }, (_, i) => {
+    const date = subMonths(new Date(), i);
+    return {
+      value: date.toISOString(),
+      label: format(date, 'MMMM yyyy', { locale: id }),
+    };
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Memuat data laporan...</span>
+      </div>
+    );
+  }
+
+  const totalPendapatan = report?.revenue || 0;
+  const totalHPP = report?.cogs || 0;
+  const labaKotor = report?.grossProfit || 0;
+  const totalBebanOperasional = report?.operatingExpenses || 0;
+  const labaBersih = report?.netProfit || 0;
+  const marginLabaBersih = report?.netMargin || 0;
 
   return (
     <div className="space-y-6">
@@ -55,21 +58,22 @@ export function LaporanLabaRugi() {
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Periode:</span>
-              <Select defaultValue="monthly">
-                <SelectTrigger className="w-40">
+              <span className="text-sm text-muted-foreground">Bulan:</span>
+              <Select
+                value={selectedMonth.toISOString()}
+                onValueChange={(v) => setSelectedMonth(new Date(v))}
+              >
+                <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly">Bulanan</SelectItem>
-                  <SelectItem value="quarterly">Triwulan</SelectItem>
-                  <SelectItem value="yearly">Tahunan</SelectItem>
+                  {monthOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Bulan:</span>
-              <Input type="month" className="w-48" defaultValue="2024-01" />
             </div>
             <Button variant="outline" className="ml-auto flex items-center gap-2">
               <Download className="h-4 w-4" />
@@ -142,7 +146,9 @@ export function LaporanLabaRugi() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Laporan Laba Rugi</CardTitle>
-          <p className="text-sm text-muted-foreground">Periode: Januari 2024</p>
+          <p className="text-sm text-muted-foreground">
+            Periode: {format(selectedMonth, 'MMMM yyyy', { locale: id })}
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
@@ -150,12 +156,10 @@ export function LaporanLabaRugi() {
             <div>
               <h3 className="font-semibold text-base mb-3 text-primary">PENDAPATAN</h3>
               <div className="space-y-2 pl-4">
-                {pendapatanData.map((item) => (
-                  <div key={item.label} className="flex justify-between py-1">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span>{formatCurrency(item.amount)}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Penjualan Obat</span>
+                  <span>{formatCurrency(totalPendapatan)}</span>
+                </div>
               </div>
               <div className="flex justify-between py-2 mt-2 border-t font-semibold">
                 <span>Total Pendapatan</span>
@@ -167,12 +171,10 @@ export function LaporanLabaRugi() {
             <div>
               <h3 className="font-semibold text-base mb-3 text-primary">HARGA POKOK PENJUALAN</h3>
               <div className="space-y-2 pl-4">
-                {hppData.map((item) => (
-                  <div key={item.label} className="flex justify-between py-1">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="text-destructive">({formatCurrency(item.amount)})</span>
-                  </div>
-                ))}
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Pembelian Obat (estimasi 70%)</span>
+                  <span className="text-destructive">({formatCurrency(totalHPP)})</span>
+                </div>
               </div>
               <div className="flex justify-between py-2 mt-2 border-t font-semibold">
                 <span>Total HPP</span>
@@ -190,12 +192,10 @@ export function LaporanLabaRugi() {
             <div>
               <h3 className="font-semibold text-base mb-3 text-primary">BEBAN OPERASIONAL</h3>
               <div className="space-y-2 pl-4">
-                {bebanOperasionalData.map((item) => (
-                  <div key={item.label} className="flex justify-between py-1">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="text-destructive">({formatCurrency(item.amount)})</span>
-                  </div>
-                ))}
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Biaya Operasional</span>
+                  <span className="text-destructive">({formatCurrency(totalBebanOperasional)})</span>
+                </div>
               </div>
               <div className="flex justify-between py-2 mt-2 border-t font-semibold">
                 <span>Total Beban Operasional</span>

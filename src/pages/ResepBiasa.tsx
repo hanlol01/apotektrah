@@ -6,6 +6,8 @@ import { DoctorSelect } from '@/components/pharmacy/DoctorSelect';
 import { MedicineSelector } from '@/components/pharmacy/MedicineSelector';
 import { TransactionSummary } from '@/components/pharmacy/TransactionSummary';
 import { Patient, Doctor, PrescriptionItem } from '@/types/pharmacy';
+import { useCreatePatient } from '@/hooks/usePatients';
+import { useCreateTransaction, generateTransactionNumber } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
 
 export default function ResepBiasa() {
@@ -14,6 +16,9 @@ export default function ResepBiasa() {
   const [items, setItems] = useState<PrescriptionItem[]>([]);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const createPatient = useCreatePatient();
+  const createTransaction = useCreateTransaction();
 
   const handleSubmit = async () => {
     // Validation
@@ -32,24 +37,61 @@ export default function ResepBiasa() {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Create or find patient
+      const patientData = await createPatient.mutateAsync({
+        name: patient.name,
+        address: patient.address || null,
+        phone: patient.phone || null,
+        birth_date: patient.birthDate || null,
+      });
 
-    const transactionNumber = `TRX-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+      // Calculate totals
+      const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+      const total = subtotal;
 
-    toast.success(
-      `Transaksi ${transactionNumber} berhasil diproses!`,
-      {
-        description: `Pasien: ${patient.name}`,
-      }
-    );
+      // Create transaction
+      const transactionNumber = generateTransactionNumber();
+      await createTransaction.mutateAsync({
+        transaction: {
+          transaction_number: transactionNumber,
+          date: new Date().toISOString(),
+          patient_id: patientData.id,
+          doctor_id: doctor.id,
+          prescription_type: 'regular',
+          subtotal,
+          service_fee: 0,
+          total,
+          payment_status: 'paid',
+          notes: notes || null,
+        },
+        prescriptionItems: items.map((item) => ({
+          medicine_id: item.medicine.id,
+          quantity: item.quantity,
+          dosage: item.dosage,
+          instructions: item.instructions || null,
+          subtotal: item.subtotal,
+        })),
+      });
 
-    // Reset form
-    setPatient({});
-    setDoctor(null);
-    setItems([]);
-    setNotes('');
-    setIsSubmitting(false);
+      toast.success(
+        `Transaksi ${transactionNumber} berhasil diproses!`,
+        {
+          description: `Pasien: ${patient.name}`,
+        }
+      );
+
+      // Reset form
+      setPatient({});
+      setDoctor(null);
+      setItems([]);
+      setNotes('');
+    } catch (error) {
+      console.error('Transaction error:', error);
+      toast.error('Gagal memproses transaksi. Silakan coba lagi.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

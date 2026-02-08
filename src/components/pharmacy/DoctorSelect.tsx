@@ -1,5 +1,5 @@
 import { Doctor } from '@/types/pharmacy';
-import { mockDoctors } from '@/data/mockData';
+import { useDoctors, DbDoctor } from '@/hooks/useDoctors';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -9,17 +9,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Stethoscope, Building, FileText } from 'lucide-react';
+import { Stethoscope, Building, FileText, Loader2 } from 'lucide-react';
 
 interface DoctorSelectProps {
   doctor: Partial<Doctor> | null;
   onChange: (doctor: Doctor | null) => void;
 }
 
+// Helper to convert DB doctor to app doctor type
+function toAppDoctor(dbDoctor: DbDoctor): Doctor {
+  return {
+    id: dbDoctor.id,
+    name: dbDoctor.name,
+    sipNumber: dbDoctor.sip_number,
+    specialization: dbDoctor.specialization,
+    hospital: dbDoctor.hospital,
+  };
+}
+
 export function DoctorSelect({ doctor, onChange }: DoctorSelectProps) {
+  const { data: doctors, isLoading } = useDoctors();
+
   const handleDoctorSelect = (doctorId: string) => {
-    const selectedDoctor = mockDoctors.find((d) => d.id === doctorId);
-    onChange(selectedDoctor || null);
+    const selectedDoctor = doctors?.find((d) => d.id === doctorId);
+    onChange(selectedDoctor ? toAppDoctor(selectedDoctor) : null);
   };
 
   return (
@@ -32,12 +45,19 @@ export function DoctorSelect({ doctor, onChange }: DoctorSelectProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2 col-span-2">
           <Label className="text-sm font-medium text-foreground">Pilih Dokter</Label>
-          <Select onValueChange={handleDoctorSelect} value={doctor?.id || ''}>
+          <Select onValueChange={handleDoctorSelect} value={doctor?.id || ''} disabled={isLoading}>
             <SelectTrigger className="input-pharmacy">
-              <SelectValue placeholder="Pilih dokter penulis resep" />
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memuat data dokter...</span>
+                </div>
+              ) : (
+                <SelectValue placeholder="Pilih dokter penulis resep" />
+              )}
             </SelectTrigger>
             <SelectContent>
-              {mockDoctors.map((doc) => (
+              {doctors?.map((doc) => (
                 <SelectItem key={doc.id} value={doc.id}>
                   {doc.name} - {doc.specialization}
                 </SelectItem>

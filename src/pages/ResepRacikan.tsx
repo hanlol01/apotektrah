@@ -6,6 +6,8 @@ import { DoctorSelect } from '@/components/pharmacy/DoctorSelect';
 import { CompoundMedicineForm } from '@/components/pharmacy/CompoundMedicineForm';
 import { TransactionSummary } from '@/components/pharmacy/TransactionSummary';
 import { Patient, Doctor, CompoundPrescription } from '@/types/pharmacy';
+import { useCreatePatient } from '@/hooks/usePatients';
+import { useCreateTransaction, generateTransactionNumber } from '@/hooks/useTransactions';
 import { toast } from 'sonner';
 
 export default function ResepRacikan() {
@@ -14,6 +16,9 @@ export default function ResepRacikan() {
   const [compoundPrescriptions, setCompoundPrescriptions] = useState<CompoundPrescription[]>([]);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const createPatient = useCreatePatient();
+  const createTransaction = useCreateTransaction();
 
   const handleSubmit = async () => {
     // Validation
@@ -32,24 +37,70 @@ export default function ResepRacikan() {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Create or find patient
+      const patientData = await createPatient.mutateAsync({
+        name: patient.name,
+        address: patient.address || null,
+        phone: patient.phone || null,
+        birth_date: patient.birthDate || null,
+      });
 
-    const transactionNumber = `TRX-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+      // Calculate totals
+      const subtotal = compoundPrescriptions.reduce((sum, p) => sum + p.subtotal, 0);
+      const serviceFee = compoundPrescriptions.reduce((sum, p) => sum + p.serviceFee, 0);
+      const total = subtotal;
 
-    toast.success(
-      `Transaksi ${transactionNumber} berhasil diproses!`,
-      {
-        description: `Pasien: ${patient.name} - ${compoundPrescriptions.length} racikan`,
-      }
-    );
+      // Create transaction
+      const transactionNumber = generateTransactionNumber();
+      await createTransaction.mutateAsync({
+        transaction: {
+          transaction_number: transactionNumber,
+          date: new Date().toISOString(),
+          patient_id: patientData.id,
+          doctor_id: doctor.id,
+          prescription_type: 'compound',
+          subtotal,
+          service_fee: serviceFee,
+          total,
+          payment_status: 'paid',
+          notes: notes || null,
+        },
+        compoundPrescriptions: compoundPrescriptions.map((cp) => ({
+          prescription: {
+            form: cp.form,
+            total_amount: cp.totalAmount,
+            dosage: cp.dosage,
+            instructions: cp.instructions || null,
+            service_fee: cp.serviceFee,
+            subtotal: cp.subtotal,
+          },
+          items: cp.items.map((item) => ({
+            medicine_id: item.medicine.id,
+            quantity: item.quantity,
+            unit: item.unit,
+          })),
+        })),
+      });
 
-    // Reset form
-    setPatient({});
-    setDoctor(null);
-    setCompoundPrescriptions([]);
-    setNotes('');
-    setIsSubmitting(false);
+      toast.success(
+        `Transaksi ${transactionNumber} berhasil diproses!`,
+        {
+          description: `Pasien: ${patient.name} - ${compoundPrescriptions.length} racikan`,
+        }
+      );
+
+      // Reset form
+      setPatient({});
+      setDoctor(null);
+      setCompoundPrescriptions([]);
+      setNotes('');
+    } catch (error) {
+      console.error('Transaction error:', error);
+      toast.error('Gagal memproses transaksi. Silakan coba lagi.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
