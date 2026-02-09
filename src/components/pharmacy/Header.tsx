@@ -1,5 +1,15 @@
-import { Bell, Search, User } from 'lucide-react';
+import { Bell, Search, User, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface HeaderProps {
   title: string;
@@ -7,6 +17,19 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success('Logout berhasil');
+      navigate('/auth');
+    } catch (error) {
+      toast.error('Gagal logout');
+    }
+  };
+
   return (
     <header className="flex items-center justify-between mb-8">
       <div>
@@ -34,15 +57,32 @@ export function Header({ title, subtitle }: HeaderProps) {
           </span>
         </button>
         
-        <button className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
-            <User className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-medium text-foreground">Apoteker</p>
-            <p className="text-xs text-muted-foreground">Admin</p>
-          </div>
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
+                <User className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-foreground">
+                  {user?.email?.split('@')[0] || 'Apoteker'}
+                </p>
+                <p className="text-xs text-muted-foreground">Staff</p>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem disabled>
+              <User className="mr-2 h-4 w-4" />
+              <span className="truncate">{user?.email}</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
